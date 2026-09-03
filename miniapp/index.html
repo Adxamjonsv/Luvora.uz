@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Luvora</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    /* Telegram temasига moslashadi: qora tema -> qora, oq tema -> oq */
+    --bg:var(--tg-theme-bg-color,#0c0c0f);
+    --card:var(--tg-theme-secondary-bg-color,#16161b);
+    --card2:var(--tg-theme-secondary-bg-color,#1e1e24);
+    --text:var(--tg-theme-text-color,#f5f5f7);
+    --muted:var(--tg-theme-hint-color,#8b8b93);
+    --line:rgba(128,128,128,.18);
+    --gold:#e3b26b; --gold2:#c9973f;
+    --like:#ff5c78; --nope:#3a3a42; --gift:#e3b26b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);overflow:hidden;}
+  #app{height:100dvh;display:flex;flex-direction:column;}
+  .topbar{display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 0 8px;font-weight:800;font-size:18px;}
+  .topbar .heart{color:var(--gold);}
+  main{flex:1;position:relative;overflow:hidden;}
+  .page{position:absolute;inset:0;overflow-y:auto;display:none;}
+  .page.on{display:block;}
+  .empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);gap:14px;padding:40px 30px;}
+  .empty .em{font-size:56px;}
+  .gbtn{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#1a1206;border:none;border-radius:16px;padding:15px 24px;font-size:16px;font-weight:800;cursor:pointer;}
+  .center{height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted);}
+
+  /* ---- DISCOVER: to'liq ekran karta ---- */
+  #deck{position:absolute;inset:0;}
+  .card{position:absolute;inset:0;border-radius:0;overflow:hidden;background:#000;will-change:transform;}
+  .card .photo{position:absolute;inset:0;background-size:cover;background-position:center;background-color:#1a1a1f;}
+  .card .grad{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.75) 22%,rgba(0,0,0,.35) 44%,rgba(0,0,0,.08) 60%,rgba(0,0,0,0) 74%);}
+  .card .dots{position:absolute;top:10px;left:14px;right:14px;display:flex;gap:5px;z-index:3;}
+  .card .dots i{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.3);}
+  .card .dots i.on{background:#fff;}
+  .card .tools{position:absolute;top:22px;right:14px;display:flex;flex-direction:column;gap:12px;z-index:3;}
+  .card .tools button{width:44px;height:44px;border-radius:50%;border:none;background:rgba(20,20,24,.7);color:#fff;font-size:18px;cursor:pointer;backdrop-filter:blur(6px);}
+  .taphint{position:absolute;top:0;bottom:150px;width:40%;z-index:2;}
+  .taphint.l{left:0;} .taphint.r{right:0;}
+  .stamp{position:absolute;top:70px;padding:6px 16px;border:3px solid;border-radius:12px;font-weight:800;font-size:28px;text-transform:uppercase;opacity:0;z-index:3;}
+  .stamp.like{left:22px;color:var(--like);border-color:var(--like);transform:rotate(-16deg);}
+  .stamp.nope{right:22px;color:#fff;border-color:#fff;transform:rotate(16deg);}
+  .card .info{position:absolute;left:0;right:0;bottom:120px;padding:0 20px;z-index:3;color:#fff;text-shadow:0 1px 10px rgba(0,0,0,.75);}
+  .card .info h2{margin:0;font-size:30px;font-weight:800;display:flex;align-items:baseline;gap:10px;}
+  .card .info h2 b{font-weight:800;} .card .info h2 span{font-size:24px;font-weight:600;}
+  .card .info .loc{margin-top:6px;font-size:15px;opacity:.9;display:flex;align-items:center;gap:5px;}
+  .card .info .tags{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;}
+  .card .info .tags span{background:rgba(30,30,36,.85);padding:8px 14px;border-radius:20px;font-size:13px;backdrop-filter:blur(4px);}
+  .card .info .about{margin-top:10px;font-size:14px;opacity:.9;max-height:60px;overflow:hidden;}
+  .swipebtns{position:absolute;left:0;right:0;bottom:34px;display:flex;align-items:center;justify-content:center;gap:14px;z-index:4;}
+  .sb{border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.5);transition:transform .12s;}
+  .sb.rew{width:48px;height:48px;background:#26262c;color:#f5c518;font-size:22px;}
+  .sb.super{width:56px;height:56px;background:#4aa8ff;color:#fff;font-size:24px;}
+  .sb:active{transform:scale(.88);}
+  .sb.no{width:56px;height:56px;background:#26262c;color:#fff;font-size:24px;}
+  .sb.gift{width:50px;height:50px;background:linear-gradient(180deg,var(--gold),var(--gold2));color:#1a1206;font-size:22px;}
+  .sb.yes{width:62px;height:62px;background:var(--like);color:#fff;font-size:28px;}
+
+  /* ---- Ro'yxatlar (Layklar/Chatlar) ---- */
+  .hd{padding:14px 18px 6px;font-size:22px;font-weight:800;}
+  .sub{padding:0 18px 10px;color:var(--muted);font-size:14px;}
+  .banner{margin:8px 16px;background:var(--card);border-radius:16px;padding:16px;text-align:center;}
+  .banner b{font-size:16px;} .banner p{color:var(--muted);font-size:13px;margin:6px 0 12px;}
+  .lgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:8px 16px 90px;}
+  .lcard{position:relative;border-radius:16px;overflow:hidden;aspect-ratio:3/4;background:#1a1a1f;}
+  .lcard .ph{position:absolute;inset:0;background-size:cover;background-position:center;}
+  .lcard .gr{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.8),transparent 55%);}
+  .lcard .nm{position:absolute;left:10px;bottom:52px;font-weight:700;font-size:15px;z-index:2;}
+  .lcard .ph.locked{filter:blur(18px) brightness(.85);transform:scale(1.15);}
+  .lcard .lockov{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);width:52px;height:52px;border-radius:50%;border:2px solid var(--gold);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(0,0,0,.35);z-index:2;}
+  .lcard .acts{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:8px;z-index:2;}
+  .lcard .acts button{flex:1;height:40px;border:none;border-radius:12px;font-size:18px;cursor:pointer;}
+  .lcard .acts .n{background:rgba(20,20,24,.85);color:#fff;} .lcard .acts .y{background:var(--like);color:#fff;}
+
+  .crow{display:flex;align-items:center;gap:12px;margin:0 16px 12px;background:var(--card);border-radius:16px;padding:12px;cursor:pointer;}
+  .crow .av{width:58px;height:58px;border-radius:50%;background-size:cover;background-position:center;background-color:#333;flex:none;}
+  .crow .t{flex:1;min-width:0;} .crow .t b{font-size:16px;} .crow .t .m{color:var(--muted);font-size:13px;margin-top:2px;}
+  .crow .go{width:40px;height:40px;border-radius:50%;background:#2a72e0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;flex:none;}
+
+  /* ---- Profil ---- */
+  .pf{padding:16px 16px 90px;}
+  .pf .avatar{width:118px;height:118px;border-radius:50%;background-size:cover;background-position:center;background-color:#333;margin:6px auto;box-shadow:0 8px 30px rgba(0,0,0,.5);}
+  .pf .nm{text-align:center;font-size:22px;font-weight:800;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;}
+  .pf .nm .v{color:var(--gold);} .pf .city{text-align:center;color:var(--muted);margin-top:2px;}
+  .stats{display:flex;background:var(--card);border-radius:16px;margin:16px 0;padding:16px 0;}
+  .stats div{flex:1;text-align:center;} .stats b{display:block;font-size:22px;color:var(--gold);font-weight:800;} .stats span{font-size:12px;color:var(--muted);}
+  .prog{background:var(--card);border-radius:16px;padding:14px 16px;margin-bottom:12px;}
+  .prog .r{display:flex;justify-content:space-between;font-size:14px;margin-bottom:10px;} .prog .r b{color:var(--gold);}
+  .bar{height:8px;border-radius:8px;background:#2a2a30;overflow:hidden;} .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold));border-radius:8px;}
+  .rowc{background:var(--card);border-radius:16px;margin-bottom:12px;overflow:hidden;}
+  .item{display:flex;align-items:center;gap:12px;padding:16px;cursor:pointer;border-bottom:1px solid var(--line);}
+  .item:last-child{border-bottom:none;}
+  .item .ic{width:38px;height:38px;border-radius:12px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--gold);flex:none;}
+  .item .tt{flex:1;} .item .tt b{font-size:15px;} .item .tt small{color:var(--muted);display:block;font-size:12px;margin-top:1px;}
+  .item .rt{color:var(--muted);}
+  .sw{width:50px;height:30px;border-radius:16px;background:#3a3a42;position:relative;transition:.2s;flex:none;}
+  .sw.on{background:var(--gold);} .sw i{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s;}
+  .sw.on i{left:23px;}
+  .langsel{display:flex;gap:6px;flex:none;}
+  .lgb{background:#3a3a42;color:var(--muted);border:none;border-radius:10px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer;}
+  .lgb.on{background:var(--gold);color:#1a1204;}
+  .badge-ok{margin:0 16px 12px;background:var(--card);border-radius:14px;padding:14px;text-align:center;color:var(--gold);font-weight:700;}
+  .del{display:block;text-align:center;color:var(--muted);text-decoration:underline;margin:18px auto;background:none;border:none;font-size:14px;cursor:pointer;}
+
+  /* ---- pastki nav ---- */
+  nav{display:flex;border-top:1px solid var(--line);background:var(--bg);}
+  nav button{flex:1;background:none;border:none;color:var(--muted);padding:9px 0 12px;font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;}
+  nav button .ic{font-size:21px;} nav button.on{color:var(--gold);}
+  nav .nb{position:absolute;top:4px;left:50%;margin-left:6px;background:var(--like);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;font-weight:700;}
+
+  /* ---- Match overlay ---- */
+  .match{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:50;text-align:center;padding:30px;}
+  .match.on{display:flex;} .match h1{font-size:34px;background:linear-gradient(90deg,var(--gold),#ff8fa8);-webkit-background-clip:text;background-clip:text;color:transparent;}
+
+  /* ---- Ro'yxatdan o'tish sehrgari ---- */
+  .wz{position:fixed;inset:0;background:var(--bg);z-index:45;display:none;flex-direction:column;}
+  .wz.on{display:flex;}
+  .wz .pbar{height:4px;background:var(--card);} .wz .pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold));transition:.3s;box-shadow:0 0 10px var(--gold);}
+  .wz .body{flex:1;overflow-y:auto;padding:30px 22px;}
+  .wz h2{font-size:29px;font-weight:800;margin:4px 0 8px;line-height:1.15;}
+  .wz .hint{color:var(--muted);font-size:15px;margin:0 0 26px;}
+  .wz .inp{width:100%;background:var(--card);border:none;border-radius:16px;padding:18px;color:var(--text);font-size:17px;outline:none;}
+  .wz textarea.inp{resize:none;min-height:110px;}
+  .wz select.inp{appearance:none;background-image:none;}
+  .opt{display:flex;align-items:center;gap:12px;background:var(--card);border:2px solid transparent;border-radius:16px;padding:16px 18px;margin-bottom:12px;cursor:pointer;font-size:16px;font-weight:600;}
+  .opt.sel{border-color:var(--gold);}
+  .opt .ic{color:var(--gold);font-size:20px;width:24px;text-align:center;}
+  .opt .rd{margin-left:auto;width:20px;height:20px;border-radius:50%;border:2px solid var(--muted);}
+  .opt.sel .rd{border-color:var(--gold);background:radial-gradient(circle,var(--gold) 45%,transparent 50%);}
+  .gsel{display:flex;gap:12px;} .gsel .opt{flex:1;justify-content:center;}
+  .photos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:8px;}
+  .pslot{position:relative;aspect-ratio:3/4;border-radius:14px;border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--muted);overflow:hidden;background:var(--card);cursor:pointer;}
+  .pslot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .pslot .rm{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;border:none;font-size:14px;z-index:2;cursor:pointer;}
+  .pslot .main{position:absolute;bottom:0;left:0;right:0;background:var(--gold);color:#1a1206;font-size:10px;font-weight:800;text-align:center;padding:2px;}
+  .wz .foot{display:flex;gap:12px;padding:14px 22px;border-top:1px solid var(--line);}
+  .wz .foot .back{background:var(--card);color:var(--text);border:none;border-radius:16px;padding:15px 20px;font-weight:700;cursor:pointer;}
+  .wz .foot .next{flex:1;}
+
+  /* ---- Suhbat (chat) ---- */
+  .chatv{position:fixed;inset:0;background:var(--bg);z-index:46;display:none;flex-direction:column;}
+  .chatv.on{display:flex;}
+  .chatv .hd2{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);}
+  .chatv .hd2 .bk{background:none;border:none;color:var(--text);font-size:26px;cursor:pointer;line-height:1;}
+  .chatv .hd2 .av{width:40px;height:40px;border-radius:50%;background-size:cover;background-position:center;background-color:#333;flex:none;}
+  .chatv .hd2 b{font-size:16px;}
+  .msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;}
+  .msg{max-width:80%;padding:10px 14px;border-radius:16px;font-size:15px;word-break:break-word;}
+  .msg.me{align-self:flex-end;background:linear-gradient(180deg,var(--gold),var(--gold2));color:#1a1206;border-bottom-right-radius:5px;}
+  .msg.you{align-self:flex-start;background:var(--card);color:var(--text);border-bottom-left-radius:5px;}
+  .msgs .empty2{margin:auto;color:var(--muted);text-align:center;line-height:1.5;}
+  .cin{display:flex;gap:10px;padding:10px 12px;border-top:1px solid var(--line);}
+  .cin input{flex:1;background:var(--card);border:none;border-radius:22px;padding:13px 18px;color:var(--text);outline:none;font-size:15px;}
+  .cin button{width:46px;height:46px;border-radius:50%;border:none;background:linear-gradient(180deg,var(--gold),var(--gold2));color:#1a1206;font-size:18px;cursor:pointer;flex:none;}
+
+  /* ---- Bottom sheet (Premium/Boost) ---- */
+  .sheet{position:fixed;inset:0;z-index:48;display:none;}
+  .sheet.on{display:block;}
+  #pickerSheet{z-index:49;}
+  .sheet .bg{position:absolute;inset:0;background:rgba(0,0,0,.6);}
+  .sheet .panel{position:absolute;left:0;right:0;bottom:0;max-height:94%;overflow-y:auto;background:var(--bg);border-radius:22px 22px 0 0;padding:8px 20px 22px;animation:up .25s ease;}
+  @keyframes up{from{transform:translateY(100%)}to{transform:none}}
+  .grip{width:44px;height:5px;border-radius:3px;background:var(--muted);opacity:.4;margin:6px auto 14px;}
+  .crown{text-align:center;font-size:38px;color:var(--gold);line-height:1;}
+  .sheet h1{text-align:center;font-size:27px;font-weight:800;margin:8px 0 2px;color:var(--gold);}
+  .sublt{text-align:center;color:var(--muted);margin-bottom:18px;}
+  .feat{background:var(--card);border-radius:18px;padding:2px 16px;margin-bottom:18px;}
+  .feat .f{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line);}
+  .feat .f:last-child{border-bottom:none;}
+  .feat .f .ic{color:var(--gold);font-size:20px;width:24px;flex:none;text-align:center;}
+  .feat .f b{font-size:16px;} .feat .f small{color:var(--muted);display:block;font-size:13px;margin-top:3px;line-height:1.35;}
+  .plans{display:flex;gap:10px;margin-bottom:18px;}
+  .plan{flex:1;background:var(--card);border:2px solid transparent;border-radius:16px;padding:14px 4px;text-align:center;cursor:pointer;position:relative;}
+  .plan.sel{border-color:var(--gold);}
+  .plan b{display:block;font-size:16px;} .plan span{color:var(--muted);font-size:13px;}
+  .plan .bdg{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--gold);color:#1a1206;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+  .pay{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:16px;padding:16px;margin-bottom:10px;cursor:pointer;position:relative;}
+  .pay.best{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#1a1206;}
+  .pay .nm{font-weight:800;font-size:16px;flex:1;} .pay .pr{text-align:right;} .pay .pr b{font-size:16px;} .pay .pr small{display:block;font-size:11px;opacity:.85;}
+  .pay .bb{position:absolute;top:-9px;right:14px;background:#141418;color:var(--gold);font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;}
+  .notnow{display:block;width:100%;text-align:center;color:var(--muted);background:none;border:none;padding:14px;margin-top:4px;font-size:15px;cursor:pointer;}
+  .boostopt{display:flex;gap:12px;margin:18px 0;}
+  .boostopt .o{flex:1;background:var(--card);border:2px solid transparent;border-radius:16px;padding:18px 8px;text-align:center;cursor:pointer;position:relative;}
+  .boostopt .o.sel{border-color:var(--gold);}
+  .boostopt .o .ic{font-size:22px;} .boostopt .o .h{margin-top:8px;font-weight:600;} .boostopt .o .st{color:var(--gold);font-weight:800;font-size:18px;margin-top:4px;} .boostopt .o .sm{color:var(--muted);font-size:12px;}
+  .boostopt .o .bdg{position:absolute;top:-9px;right:8px;background:#2ecc71;color:#06210f;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;}
+
+  /* ---- Profil tahrirlash ---- */
+  .editv{position:fixed;inset:0;background:var(--bg);z-index:47;display:none;flex-direction:column;}
+  .editv.on{display:flex;}
+  .eh{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);}
+  .eh .bk{background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;line-height:1;}
+  .eh b{font-size:18px;}
+  .ebody{flex:1;overflow-y:auto;padding:14px 16px 96px;}
+  .eprog .r{display:flex;justify-content:space-between;font-size:13px;color:var(--gold);margin-bottom:8px;font-weight:600;}
+  .sec{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.6px;margin:22px 0 10px;text-transform:uppercase;}
+  .sec .pct{color:var(--gold);background:rgba(227,178,107,.15);padding:1px 7px;border-radius:8px;margin-left:6px;font-size:11px;}
+  .ephotos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .epslot{position:relative;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:var(--card);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:28px;cursor:pointer;}
+  .epslot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .epslot.filled{border-style:solid;border-color:transparent;}
+  .epslot .x{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;border:none;font-size:13px;z-index:2;cursor:pointer;}
+  .epslot .main{position:absolute;bottom:0;left:0;right:0;background:var(--gold);color:#1a1206;font-size:10px;font-weight:800;text-align:center;padding:2px;}
+  .epslot .num{position:absolute;top:4px;left:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;border-radius:8px;padding:0 6px;z-index:2;}
+  .hint2{color:var(--muted);font-size:12px;margin:6px 2px 2px;line-height:1.4;}
+  .fld{margin-bottom:10px;}
+  .fld label{display:block;color:var(--muted);font-size:12px;margin:0 2px 6px;}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:8px 14px;font-size:14px;cursor:pointer;}
+  .chip.on{background:rgba(227,178,107,.15);border-color:var(--gold);color:var(--gold);}
+  .rng{display:flex;align-items:center;gap:10px;margin:8px 2px;} .rng input[type=range]{flex:1;accent-color:var(--gold);}
+  .rng .lab{font-size:13px;color:var(--muted);min-width:26px;text-align:center;}
+  .esave{position:absolute;left:0;right:0;bottom:0;padding:12px 16px 16px;background:linear-gradient(to top,var(--bg) 72%,transparent);}
+  .erow{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:14px;padding:15px 16px;margin-bottom:10px;cursor:pointer;transition:transform .1s;}
+  .erow:active{transform:scale(.99);}
+  .erow .ei{color:var(--gold);width:22px;text-align:center;font-size:17px;flex:none;}
+  .erow .ek{flex:1;font-size:15px;font-weight:500;}
+  .erow .ev{color:var(--gold);font-size:14px;max-width:50%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .erow .ev.miss{color:var(--muted);}
+  .erow .ea{color:var(--muted);font-size:18px;flex:none;}
+  .pctb{color:var(--gold);background:rgba(227,178,107,.16);padding:1px 6px;border-radius:8px;font-size:11px;margin-left:5px;font-weight:700;}
+  .einp{width:100%;background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:15px;color:var(--text);font-size:16px;outline:none;}
+  .einp:focus{border-color:var(--gold);}
+  textarea.einp{resize:none;min-height:96px;}
+  .psh{font-size:20px;font-weight:800;margin:8px 0 16px;text-align:center;}
+  .pick{background:var(--card);border-radius:14px;padding:15px 16px;margin-bottom:8px;font-size:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border:1.5px solid transparent;}
+  .pick.sel{border-color:var(--gold);color:var(--gold);}
+  .glock{width:100%;background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:15px;color:var(--muted);font-size:16px;}
+  .giftgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:8px 0 16px;}
+  .giftitem{background:var(--card);border-radius:16px;padding:14px 6px;text-align:center;cursor:pointer;border:1.5px solid transparent;transition:transform .1s;}
+  .giftitem:active{transform:scale(.94);border-color:var(--gold);}
+  .giftitem .ge{font-size:34px;line-height:1;}
+  .giftitem .gn{font-size:13px;margin-top:6px;}
+  .giftitem .gs{color:var(--gold);font-weight:800;font-size:13px;margin-top:3px;}
+  .lcard .giftbadge{position:absolute;top:8px;right:8px;font-size:22px;z-index:3;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar"><img src="/logo" onerror="this.style.display='none';document.getElementById('hheart').style.display='inline'" style="width:26px;height:26px;border-radius:50%;object-fit:cover;margin-right:8px;vertical-align:middle"><span class="heart" id="hheart" style="display:none">♡</span> Luvora</div>
+  <main>
+    <section id="p-discover" class="page on"><div id="deck"></div>
+      <div class="swipebtns" id="swipebtns" style="display:none">
+        <button class="sb rew" onclick="rewindSwipe()">↺</button>
+        <button class="sb no" onclick="swipe('nope')">✕</button>
+        <button class="sb gift" onclick="openGifts()">🎁</button>
+        <button class="sb yes" onclick="swipe('like')">❤</button>
+      </div>
+    </section>
+    <section id="p-likes" class="page"></section>
+    <section id="p-chats" class="page"></section>
+    <section id="p-profile" class="page"></section>
+  </main>
+  <nav>
+    <button data-tab="discover" class="on" onclick="tab('discover')"><span class="ic">🗂️</span>Anketalar</button>
+    <button data-tab="likes" onclick="tab('likes')"><span class="ic">❤️</span>Layklar<span class="nb" id="likeBadge" style="display:none">0</span></button>
+    <button data-tab="chats" onclick="tab('chats')"><span class="ic">💬</span>Chatlar</button>
+    <button data-tab="profile" onclick="tab('profile')"><span class="ic">👤</span>Profil</button>
+  </nav>
+</div>
+<div class="wz" id="wz">
+  <div class="pbar"><i id="wzbar" style="width:0"></i></div>
+  <div class="body" id="wzbody"></div>
+  <div class="foot">
+    <button class="back" id="wzback" onclick="wzPrev()" style="visibility:hidden">Orqaga</button>
+    <button class="gbtn next" id="wznext" onclick="wzNext()">Davom etish</button>
+  </div>
+</div>
+<input type="file" id="wzfile" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;left:-9999px;">
+
+<div class="chatv" id="chatv">
+  <div class="hd2"><button class="bk" onclick="closeChat()">‹</button><div class="av" id="chAv"></div><b id="chNm"></b></div>
+  <div class="msgs" id="chMsgs"></div>
+  <div class="cin"><input id="chInput" placeholder="Xabar yozing..." onkeydown="if(event.key==='Enter')sendMsg2()"><button onclick="sendMsg2()">➤</button></div>
+</div>
+
+<div class="editv" id="editv">
+  <div class="eh"><button class="bk" onclick="closeEdit()">‹</button><b>Tahrirlash</b></div>
+  <div class="ebody" id="editBody"></div>
+  <div class="esave"><button class="gbtn" style="width:100%" onclick="saveEdit()">Saqlash</button></div>
+</div>
+<input type="file" id="editFile" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;left:-9999px;">
+<div class="sheet" id="pickerSheet"><div class="bg" onclick="closeSheet('pickerSheet')"></div><div class="panel" id="pickerPanel"></div></div>
+
+<div class="sheet" id="premiumSheet"><div class="bg" onclick="closeSheet('premiumSheet')"></div><div class="panel" id="premiumPanel"></div></div>
+<div class="sheet" id="boostSheet"><div class="bg" onclick="closeSheet('boostSheet')"></div><div class="panel" id="boostPanel"></div></div>
+<div class="sheet" id="filterSheet"><div class="bg" onclick="closeSheet('filterSheet')"></div><div class="panel" id="filterPanel"></div></div>
+<div class="sheet" id="giftSheet"><div class="bg" onclick="closeSheet('giftSheet')"></div><div class="panel" id="giftPanel"></div></div>
+
+<div class="match" id="matchOv" onclick="this.classList.remove('on')">
+  <div style="font-size:60px">💛</div>
+  <h1>Moslik!</h1>
+  <p style="color:#ccc" id="matchTxt">Siz mos keldingiz. Chatlar bo'limидан yozing.</p>
+  <button class="gbtn" style="margin-top:16px" onclick="event.stopPropagation();document.getElementById('matchOv').classList.remove('on');tab('chats')">Chatlarga o'tish</button>
+  <p style="color:#666;margin-top:14px">Yopish uchun bosing</p>
+</div>
+
+<script>
+const tg = (window.Telegram && window.Telegram.WebApp) || {ready(){},expand(){},initData:"",close(){},showPopup:null,openTelegramLink:null,HapticFeedback:null,setHeaderColor(){},setBackgroundColor(){}};
+try{tg.ready();tg.expand();}catch(e){}
+try{tg.setHeaderColor&&tg.setHeaderColor('secondary_bg_color');tg.setBackgroundColor&&tg.setBackgroundColor('bg_color');}catch(e){}
+const INIT = tg.initData || "";
+let LNG="uz", ME=null;
+const T={uz:{nomore:"Hozircha yangi anketa yo'q",later:"Keyinroq qaytib kel.",needreg:"Avval botda ro'yxatdan o'ting",open:"Botni ochish",
+  pending:"Anketangiz tekshiruvda ⏳",pend2:"Admin tasdiqlagach ochiladi.",nolikes:"Hozircha layk yo'q",nochats:"Hali moslik yo'q. Layk bosishда davom et!",
+  likedyou:"Sizga layk bosishdi",swipemore:"O'zaro layk topish uchun davom et",msg:"Xabaringni yoz:",sent:"Yuborildi ✅",
+  layklar:"LAYKLAR",moslik:"MOSLIK",kunlar:"KUNLAR",edit:"Tahrirlash",visible:"Anketa hammaga ko'rinadi",confirmed:"Tasdiqlangan",pending2:"Tekshiruvda",
+  premium:"Premium olish",premdesc:"Ko'proq moslik va lentada ustuvorlik",boost:"Anketani yuqoriga ko'tarish",boostdesc:"5x ko'p ko'rsatish",help:"Yordam",helpdesc:"Biror narsa ishlamasa, bizga yozing",del:"Anketani o'chirish",
+  soon:"Bu funksiya keyingi bosqichда qo'shiladi 🔜",writeTg:"Telegram'да yozish",report:"Shikoyat yuborildi. Rahmat!",
+  lang:"Til / Язык",tabFeed:"Anketalar",tabLikes:"Layklar",tabChats:"Chatlar",tabProfile:"Profil",online:"onlayn",langChanged:"Til o'zgartirildi ✅",
+  limitTitle:"Limit tugadi",limitMsg:"24 soatlik layk/dislayk zaxirangiz tugadi. Zaxira asta-sekin o'zi tiklanadi yoki Premium oling 👑 — cheksiz.",limitWait:"⏳ Keyingi layk ~{m} daqiqadan keyin.",limitBtn:"Premium olish",
+  subTitle:"Kanalimizga obuna bo'ling",subDesc:"Davom etish uchun rasmiy Luvora kanaliga obuna bo'ling. Bu bir marta.",subOpen:"📢 Kanalga obuna bo'lish",subCheck:"✅ Tekshirish",subOk:"Rahmat! Obuna tasdiqlandi ✅",subNo:"Obuna topilmadi. Avval obuna bo'ling 👆",
+  invite:"Do'st taklif qilish",inviteDesc:"Har 5 do'st uchun 1 oy Premium 👑",inviteShare:"Luvora — yangi tanishuvlar shu yerda! Menga qo'shil 💞",
+  verifyTitle:"Identifikatsiyadan o'ting",verifyDesc:"Bottan to'liq foydalanish uchun identifikatsiyadan o'ting. Botga o'tib telefon raqamingiz va video-krujok yuboring. Admin tasdiqlagach anketangiz hammaga ko'rinadi.",verifyBtn:"🪪 Identifikatsiyadan o'tish"},
+ ru:{nomore:"Пока новых анкет нет",later:"Загляни позже.",needreg:"Сначала зарегистрируйтесь в боте",open:"Открыть бота",
+  pending:"Ваша анкета на проверке ⏳",pend2:"Откроется после подтверждения админом.",nolikes:"Пока лайков нет",nochats:"Пока нет совпадений. Продолжай ставить лайки!",
+  likedyou:"Вам поставили лайк",swipemore:"Продолжай, чтобы найти взаимный лайк",msg:"Напиши сообщение:",sent:"Отправлено ✅",
+  layklar:"ЛАЙКИ",moslik:"СОВПАДЕНИЯ",kunlar:"ДНИ",edit:"Редактировать",visible:"Анкета видна всем",confirmed:"Подтверждена",pending2:"На проверке",
+  premium:"Купить Premium",premdesc:"Больше совпадений и приоритет в ленте",boost:"Поднять анкету",boostdesc:"Показ в 5 раз чаще",help:"Помощь",helpdesc:"Если что-то не работает, напишите нам",del:"Удалить анкету",
+  soon:"Эта функция появится позже 🔜",writeTg:"Написать в Telegram",report:"Жалоба отправлена. Спасибо!",
+  lang:"Язык / Til",tabFeed:"Анкеты",tabLikes:"Лайки",tabChats:"Чаты",tabProfile:"Профиль",online:"онлайн",langChanged:"Язык изменён ✅",
+  limitTitle:"Лимит исчерпан",limitMsg:"Ваш суточный запас лайков/дизлайков закончился. Запас восстановится сам со временем или оформите Premium 👑 — безлимит.",limitWait:"⏳ Следующий лайк через ~{m} мин.",limitBtn:"Купить Premium",
+  subTitle:"Подпишитесь на наш канал",subDesc:"Чтобы продолжить, подпишитесь на официальный канал Luvora. Это разово.",subOpen:"📢 Подписаться на канал",subCheck:"✅ Проверить",subOk:"Спасибо! Подписка подтверждена ✅",subNo:"Подписка не найдена. Сначала подпишитесь 👆",
+  invite:"Пригласить друга",inviteDesc:"За каждые 5 друзей 1 месяц Premium 👑",inviteShare:"Luvora — новые знакомства здесь! Присоединяйся 💞",
+  verifyTitle:"Пройдите идентификацию",verifyDesc:"Для полного доступа пройдите идентификацию. Перейдите в бота и отправьте номер телефона и видео-кружок. После подтверждения админом ваша анкета станет видна всем.",verifyBtn:"🪪 Пройти идентификацию"}};
+const tr=k=>((T[LNG]||T.uz)[k]!==undefined?(T[LNG]||T.uz)[k]:(T.uz[k]||''));
+async function setLang(l){
+  LNG=(l==='ru')?'ru':'uz';
+  try{localStorage.setItem('luvora_lng',LNG);}catch(_){}
+  api('/api/set_lang',{method:'POST',body:JSON.stringify({lng:LNG})});
+  applyLang();
+  try{loadProfile();}catch(_){}
+  toast(tr('langChanged'));
+}
+function inviteFriends(){
+  const link=(ME&&ME.invite_link)||('https://t.me/Luvoraofficialbot');
+  const txt=tr('inviteShare');
+  const url="https://t.me/share/url?url="+encodeURIComponent(link)+"&text="+encodeURIComponent(txt);
+  if(tg&&tg.openTelegramLink)tg.openTelegramLink(url);else window.open(url,'_blank');
+}
+function applyLang(){
+  const map={discover:'tabFeed',likes:'tabLikes',chats:'tabChats',profile:'tabProfile'};
+  document.querySelectorAll('nav button').forEach(btn=>{
+    const key=map[btn.dataset.tab];if(!key)return;const label=tr(key);
+    for(const n of btn.childNodes){if(n.nodeType===3&&n.textContent.trim()){n.textContent=label;break;}}
+  });
+}
+try{const sv=localStorage.getItem('luvora_lng');if(sv)LNG=sv;}catch(_){}
+async function api(p,o={}){o.headers=Object.assign({"X-Init-Data":INIT,"Content-Type":"application/json"},o.headers||{});
+  try{const r=await fetch(p,o);const tx=await r.text();try{return JSON.parse(tx);}catch(_){return{error:'badjson',status:r.status,body:(tx||'').slice(0,140)};}}
+  catch(e){return{error:'net',detail:String(e)};}}
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+// Rasmni yuborishdan oldin brauzerda kichraytirib/siqib beradi (katta/HEIC fayllar muammosini yechadi)
+function compressImage(file){
+  return new Promise(resolve=>{
+    try{
+      const url=URL.createObjectURL(file);
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          const MAX=1280;let w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+          if(!w||!h){URL.revokeObjectURL(url);return resolve(file);}
+          if(w>h&&w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+          else if(h>=w&&h>MAX){w=Math.round(w*MAX/h);h=MAX;}
+          const c=document.createElement('canvas');c.width=w;c.height=h;
+          c.getContext('2d').drawImage(img,0,0,w,h);
+          URL.revokeObjectURL(url);
+          c.toBlob(b=>resolve(b&&b.size?b:file),'image/jpeg',0.82);
+        }catch(_){URL.revokeObjectURL(url);resolve(file);}
+      };
+      img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
+      img.src=url;
+    }catch(_){resolve(file);}
+  });
+}
+async function uploadPhoto(file){
+  const blob=await compressImage(file);
+  const fd=new FormData();fd.append("file",blob,"photo.jpg");
+  const r=await fetch('/api/upload',{method:'POST',headers:{"X-Init-Data":INIT},body:fd});
+  let j={};try{j=await r.json();}catch(_){}
+  if(!j.url) throw new Error(j.error||('HTTP '+r.status));
+  return j.url;
+}
+
+function tab(n){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.getElementById('p-'+n).classList.add('on');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===n));
+  document.getElementById('swipebtns').style.display = (n==='discover'&&feed.length)?'flex':'none';
+  if(n==='likes')loadLikes(); if(n==='chats')loadChats(); if(n==='profile')loadProfile();
+}
+
+/* ===== DISCOVER ===== */
+let feed=[],topCard=null,photoIdx=0;
+async function loadFeed(){
+  const d=await api('/api/feed');
+  const deck=document.getElementById('deck');
+  if(d.error){showErr('feed xato: '+d.error+' '+(d.status||'')+' '+(d.body||d.detail||''));return;}
+  if(d.need_reg){showWizard();return;}
+  if(d.need_verify){state(deck,'🪪',tr('verifyTitle'),tr('verifyBtn'),()=>tg.close(),tr('verifyDesc'));return;}
+  if(d.need_sub){showSubGate(deck,d.channel);return;}
+  if(d.pending){state(deck,'⏳',tr('pending'),null,null,tr('pend2'));return;}
+  feed=d.items||[]; renderDeck();
+}
+function showSubGate(c,channel){
+  document.getElementById('swipebtns').style.display='none';
+  c.innerHTML=`<div class="empty">
+    <div class="em">📢</div>
+    <div style="font-size:19px;color:var(--text);font-weight:700">${tr('subTitle')}</div>
+    <div style="margin:6px 22px 0">${tr('subDesc')}</div>
+    <button class="gbtn" id="subOpen" style="margin-top:20px">${tr('subOpen')}</button>
+    <button class="gbtn" id="subCheck" style="margin-top:10px;background:transparent;border:1.5px solid var(--gold);color:var(--gold)">${tr('subCheck')}</button>
+  </div>`;
+  c.querySelector('#subOpen').onclick=()=>{
+    const url=channel||'https://t.me/LuvoraOfficial';
+    if(tg&&tg.openTelegramLink)tg.openTelegramLink(url);else window.open(url,'_blank');
+  };
+  c.querySelector('#subCheck').onclick=async()=>{
+    const btn=c.querySelector('#subCheck');btn.textContent='...';btn.disabled=true;
+    const r=await api('/api/check_sub',{method:'POST',body:'{}'});
+    if(r&&r.subscribed){toast(tr('subOk'));loadFeed();}
+    else{btn.textContent=tr('subCheck');btn.disabled=false;toast(tr('subNo'));}
+  };
+}
+function state(c,em,title,btn,fn,sub){
+  document.getElementById('swipebtns').style.display='none';
+  c.innerHTML=`<div class="empty"><div class="em">${em}</div><div style="font-size:18px;color:var(--text)">${title}</div>${sub?`<div>${sub}</div>`:''}</div>`;
+  if(btn){const b=document.createElement('button');b.className='gbtn';b.textContent=btn;b.onclick=fn;c.querySelector('.empty').appendChild(b);}
+}
+function renderDeck(){
+  const deck=document.getElementById('deck');
+  document.getElementById('swipebtns').style.display=feed.length?'flex':'none';
+  if(!feed.length){state(deck,'🙌',tr('nomore'),null,null,tr('later'));return;}
+  const p=feed[0]; photoIdx=0;
+  const ph=(p.photos&&p.photos[0])||'';
+  deck.innerHTML=`<div class="card" id="topcard">
+    <div class="photo" style="background-image:url('${ph}')"></div><div class="grad"></div>
+    <div class="dots">${(p.photos||['']).map((_,k)=>`<i class="${k===0?'on':''}"></i>`).join('')}</div>
+    <div class="tools"><button onclick="openFilter()">⚙️</button><button onclick="reportCur()">⚠️</button></div>
+    <div class="stamp like">LIKE</div><div class="stamp nope">NOPE</div>
+    <div class="taphint l"></div><div class="taphint r"></div>
+    <div class="info"><h2><b>${esc(p.name)}</b><span>${p.age||''}</span>${p.premium?' <span style="font-size:22px">👑</span>':''}</h2>
+      <div class="loc">📍 ${esc(p.dist||p.city||'')}${p.online?' · <span style="color:#38d39f;font-weight:600">🟢 '+tr('online')+'</span>':''}</div>
+      ${p.about?`<div class="about">${esc(p.about)}</div>`:''}</div></div>`;
+  topCard=document.getElementById('topcard'); attachSwipe(topCard,p); attachTap(topCard,p);
+}
+function attachTap(card,p){
+  card.querySelectorAll('.taphint').forEach(z=>z.onclick=()=>{
+    if(!p.photos||p.photos.length<2)return;
+    photoIdx+=z.classList.contains('r')?1:-1;
+    if(photoIdx<0)photoIdx=p.photos.length-1; if(photoIdx>=p.photos.length)photoIdx=0;
+    card.querySelector('.photo').style.backgroundImage=`url('${p.photos[photoIdx]}')`;
+    card.querySelectorAll('.dots i').forEach((d,k)=>d.classList.toggle('on',k===photoIdx));
+  });
+}
+function attachSwipe(card,p){
+  let sx=0,dx=0,dy=0,drag=false;
+  const like=card.querySelector('.stamp.like'),nope=card.querySelector('.stamp.nope');
+  const dn=e=>{drag=true;const t=e.touches?e.touches[0]:e;sx=t.clientX;card.style.transition='none';};
+  const mv=e=>{if(!drag)return;const t=e.touches?e.touches[0]:e;dx=t.clientX-sx;dy=(e.touches?e.touches[0]:e).clientY;
+    card.style.transform=`translateX(${dx}px) rotate(${dx/22}deg)`;like.style.opacity=Math.max(0,dx/110);nope.style.opacity=Math.max(0,-dx/110);};
+  const up=()=>{if(!drag)return;drag=false;card.style.transition='transform .3s';
+    if(Math.abs(dx)>110)finish(dx>0?'like':'nope');else{card.style.transform='';like.style.opacity=0;nope.style.opacity=0;}dx=0;};
+  card.addEventListener('touchstart',dn,{passive:true});card.addEventListener('touchmove',mv,{passive:true});card.addEventListener('touchend',up);
+  card.addEventListener('mousedown',dn);window.addEventListener('mousemove',mv);window.addEventListener('mouseup',up);
+}
+async function finish(dir){
+  if(!feed.length||!topCard)return;
+  const p=feed.shift();
+  const goR=(dir==='like'||dir==='super'||dir==='gift');
+  const off=goR?window.innerWidth:-window.innerWidth;
+  topCard.style.transform=`translateX(${off}px) rotate(${goR?22:-22}deg)`;topCard.style.opacity='0';
+  try{tg.HapticFeedback&&tg.HapticFeedback.impactOccurred('light');}catch(e){}
+  const map={like:'like',super:'super',gift:'gift',nope:'pass'};
+  const r=await api('/api/act',{method:'POST',body:JSON.stringify({target:p.id,action:map[dir]||'pass'})});
+  if(r&&r.limit){feed.unshift(p);renderDeck();showLimit(r);return;}
+  if(r&&r.match)showMatch(p.name);
+  setTimeout(renderDeck,180);
+  if(feed.length<=1)prefetch();
+}
+function swipe(dir){finish(dir);}
+function showLimit(r){
+  const w=(r&&r.wait_min)||15;
+  const msg=tr('limitMsg')+"\n\n"+tr('limitWait').replace('{m}',w);
+  if(tg&&tg.showPopup){
+    tg.showPopup({title:tr('limitTitle'),message:msg,buttons:[{id:'go',type:'default',text:tr('limitBtn')},{id:'no',type:'cancel',text:'✕'}]},
+      id=>{if(id==='go')openPremium();});
+  }else{ toast(msg); openPremium(); }
+}
+function toast(msg){const t=document.createElement('div');t.textContent=msg;t.style.cssText='position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:rgba(0,0,0,.88);color:#fff;padding:11px 20px;border-radius:22px;z-index:60;font-size:14px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.4)';document.body.appendChild(t);setTimeout(()=>{t.style.transition='.3s';t.style.opacity='0';setTimeout(()=>t.remove(),300);},1400);}
+const GIFTS=[
+  {id:'heart',emoji:'❤️',name:'Yurak',stars:10},
+  {id:'rose',emoji:'🌹',name:'Atirgul',stars:15},
+  {id:'choco',emoji:'🍫',name:'Shokolad',stars:25},
+  {id:'teddy',emoji:'🧸',name:'Ayiqcha',stars:40},
+  {id:'bouquet',emoji:'💐',name:'Guldasta',stars:60},
+  {id:'ring',emoji:'💍',name:'Uzuk',stars:150},
+];
+let giftTarget=null,giftTargetName='';
+function openGifts(){if(!feed.length)return;giftTarget=feed[0].id;giftTargetName=feed[0].name||'';renderGifts();document.getElementById('giftSheet').classList.add('on');}
+function renderGifts(){
+  document.getElementById('giftPanel').innerHTML=`<div class="grip"></div><div class="psh">🎁 Sovg'a yuborish</div><div class="sublt">${esc(giftTargetName)} ga sovg'a tanlang</div>
+    <div class="giftgrid">`+GIFTS.map(g=>`<div class="giftitem" onclick="buyGift('${g.id}')"><div class="ge">${g.emoji}</div><div class="gn">${g.name}</div><div class="gs">${g.stars} ⭐</div></div>`).join('')+`</div>
+    <button class="notnow" onclick="closeSheet('giftSheet')">Yopish</button>`;
+}
+async function buyGift(gid){
+  const r=await api('/api/gift_invoice',{method:'POST',body:JSON.stringify({gift:gid,target:giftTarget})});
+  if(!r||!r.link){alert("Xato"+(r&&r.detail?': '+r.detail:''));return;}
+  if(!tg.openInvoice){alert("Telegram versiyangiz Stars to'lovini qo'llamaydi — yangilang.");return;}
+  tg.openInvoice(r.link,(status)=>{if(status==='paid'){closeSheet('giftSheet');toast("🎁 Sovg'a yuborildi!");}else if(status==='failed')toast("To'lov amalga oshmadi");});
+}
+async function rewindSwipe(){
+  const r=await api('/api/rewind',{method:'POST'});
+  if(r&&r.ok&&r.profile){feed.unshift(r.profile);renderDeck();try{tg.HapticFeedback&&tg.HapticFeedback.impactOccurred('light');}catch(e){}}
+  else{tg.showPopup?tg.showPopup({message:"Qaytaradigan anketa yo'q"}):alert("Qaytaradigan anketa yo'q");}
+}
+/* ---- Filtr ---- */
+let FLT={age_min:18,age_max:60,city:'',max_km:0};
+async function openFilter(){const d=await api('/api/filter');FLT={age_min:d.age_min||18,age_max:d.age_max||60,city:d.city||'',max_km:d.max_km||0};document.getElementById('filterSheet').classList.add('on');renderFilter();}
+function renderFilter(){document.getElementById('filterPanel').innerHTML=`<div class="grip"></div><div class="psh">Filtr</div>
+  <div class="sec" style="margin-top:0">Yosh — <span id="f_arange" style="color:var(--gold)">${FLT.age_min}–${FLT.age_max}</span></div>
+  <div class="rng"><span class="lab">14</span><input type="range" id="f_amin" min="14" max="99" value="${FLT.age_min}" oninput="fArange()"><span class="lab">99</span></div>
+  <div class="rng"><span class="lab">14</span><input type="range" id="f_amax" min="14" max="99" value="${FLT.age_max}" oninput="fArange()"><span class="lab">99</span></div>
+  <div class="sec">Shahar</div>
+  <div class="erow" onclick="fPickCity()"><div class="ei">📍</div><div class="ek">Shahar</div><div class="ev">${esc(FLT.city||'Barchasi')}</div><div class="ea">›</div></div>
+  <div class="sec">Masofa — <span id="f_kmv" style="color:var(--gold)">${FLT.max_km?FLT.max_km+' km':'cheksiz'}</span></div>
+  <div class="rng"><span class="lab">0</span><input type="range" id="f_km" min="0" max="500" step="10" value="${FLT.max_km}" oninput="fKm()"><span class="lab">500</span></div>
+  <button class="gbtn" style="width:100%;margin-top:12px" onclick="applyFilter()">Qo'llash</button>
+  <button class="notnow" onclick="closeSheet('filterSheet')">Bekor</button>`;}
+function fArange(){let a=+document.getElementById('f_amin').value,b=+document.getElementById('f_amax').value;if(a>b){const t=a;a=b;b=t;}FLT.age_min=a;FLT.age_max=b;document.getElementById('f_arange').textContent=a+"–"+b;}
+function fKm(){FLT.max_km=+document.getElementById('f_km').value;document.getElementById('f_kmv').textContent=FLT.max_km?FLT.max_km+' km':'cheksiz';}
+function fPickCity(){openPicker('Shahar',['Barchasi'].concat(CITIES),FLT.city||'Barchasi',v=>{FLT.city=(v==='Barchasi')?'':v;renderFilter();});}
+async function applyFilter(){await api('/api/filter',{method:'POST',body:JSON.stringify(FLT)});closeSheet('filterSheet');feed=[];loadFeed();}
+async function prefetch(){const d=await api('/api/feed');const have=new Set(feed.map(x=>x.id));(d.items||[]).forEach(x=>{if(!have.has(x.id))feed.push(x);});}
+function reportCur(){if(!feed.length)return;if(!confirm('Bu anketaga shikoyat qilasizmi?'))return;
+  api('/api/report',{method:'POST',body:JSON.stringify({target:feed[0].id})});feed.shift();renderDeck();alert(tr('report'));}
+function showMatch(nm){document.getElementById('matchTxt').textContent=(nm||'')+" bilan mos keldingiz!";document.getElementById('matchOv').classList.add('on');refreshBadge();}
+
+/* ===== LIKES ===== */
+async function loadLikes(){
+  const el=document.getElementById('p-likes');el.innerHTML='<div class="center">…</div>';
+  const d=await api('/api/likes');const items=d.items||[];const prem=d.premium;
+  let html=`<div class="hd">❤️ Layklar</div>`;
+  html+=`<div class="banner"><b>Sizga layk bosishdi · ${items.length}</b><p>O'zaro layk topish uchun davom et</p></div>`;
+  if(!items.length){html+=`<div class="empty" style="height:auto;padding:30px"><div class="em">❤️</div><div>Hozircha layk yo'q</div></div>`;el.innerHTML=html;return;}
+  if(!prem){html+=`<div style="padding:0 16px 12px"><button class="gbtn" style="width:100%" onclick="openPremium()">🔓 Barcha layklarni ochish · ${items.length}</button><div class="hint2" style="text-align:center">Premium — kim layk bosganini ko'r va javob ber</div></div>`;}
+  html+='<div class="lgrid">';
+  items.forEach((p)=>{const ph=(p.photos&&p.photos[0])||'';const lk=p.locked;
+    const nm=lk?`${p.age||''}<br><span style="font-weight:400;font-size:12px;opacity:.85">Ism yashirilgan</span>`:`${esc(p.name)}, ${p.age||''}${p.super?' <span style="color:#4aa8ff">⭐</span>':''}`;
+    const xClick=lk?'openPremium()':`decide('${p.id}',false,this)`;
+    const yClick=lk?'openPremium()':`decide('${p.id}',true,this)`;
+    html+=`<div class="lcard"><div class="ph ${lk?'locked':''}" style="background-image:url('${ph}')"></div><div class="gr"></div>
+      ${p.gift?`<div class="giftbadge">${p.gift}</div>`:''}
+      ${lk?'<div class="lockov">🔒</div>':''}
+      <div class="nm">${nm}</div>
+      <div class="acts"><button class="n" onclick="${xClick}">✕</button><button class="y" onclick="${yClick}">❤</button></div></div>`;});
+  html+='</div>';el.innerHTML=html;
+}
+async function decide(id,accept,btn){
+  const card=btn.closest('.lcard');card.style.transition='.2s';card.style.opacity='0';card.style.transform='scale(.8)';
+  const r=await api('/api/like_decide',{method:'POST',body:JSON.stringify({from:id,accept})});
+  setTimeout(()=>card.remove(),200);
+  if(accept&&r.contact)showMatch(null);
+  refreshBadge();
+}
+
+/* ===== CHATS ===== */
+let CHATS=[];
+async function loadChats(){
+  const el=document.getElementById('p-chats');el.innerHTML='<div class="center">…</div>';
+  const d=await api('/api/chats');CHATS=d.items||[];
+  let html=`<div class="hd">💬 Chatlar</div><div class="sub">Xabarlar</div>`;
+  if(!CHATS.length){html+=`<div class="empty" style="height:auto;padding:30px"><div class="em">💬</div><div>${tr('nochats')}</div></div>`;el.innerHTML=html;return;}
+  CHATS.forEach((p,i)=>{const ph=(p.photos&&p.photos[0])||'';const prev=p.last?esc(p.last):'Suhbatni boshlang 👋';
+    html+=`<div class="crow" onclick="openChatIdx(${i})">
+      <div class="av" style="background-image:url('${ph}')"></div>
+      <div class="t"><b>${esc(p.name)}, ${p.age||''}${p.online?' <span style="color:#38d39f">🟢</span>':''}</b><div class="m">${prev}</div></div>
+      <div class="go">💬</div></div>`;});
+  el.innerHTML=html;
+}
+function openChatIdx(i){const p=CHATS[i];openChat(p.id,p.name,(p.photos&&p.photos[0])||'');}
+
+/* ===== SUHBAT ===== */
+let chatWith=null,chatName='',chatLastTs=0,chatPoll=null;
+function openChat(uid,name,photo){
+  chatWith=uid;chatName=name;chatLastTs=0;
+  document.getElementById('chNm').textContent=name;
+  document.getElementById('chAv').style.backgroundImage=`url('${photo||''}')`;
+  document.getElementById('chMsgs').innerHTML='';
+  document.getElementById('chatv').classList.add('on');
+  loadMsgs(true);
+  clearInterval(chatPoll);chatPoll=setInterval(()=>loadMsgs(false),2500);
+}
+function closeChat(){document.getElementById('chatv').classList.remove('on');clearInterval(chatPoll);chatWith=null;loadChats();}
+async function loadMsgs(first){
+  if(!chatWith)return;
+  const d=await api(`/api/messages?with=${chatWith}&after=${chatLastTs}`);
+  const box=document.getElementById('chMsgs');const me=d.me;
+  if(first&&!(d.items||[]).length&&!box.children.length)
+    box.innerHTML=`<div class="empty2">Suhbatni boshlang 👋<br>${esc(chatName)} bilan yozishing mumkin.</div>`;
+  (d.items||[]).forEach(m=>{
+    const e2=box.querySelector('.empty2');if(e2)e2.remove();
+    const el=document.createElement('div');el.className='msg '+(m.from===me?'me':'you');el.textContent=m.text;box.appendChild(el);
+    if(m.ts>chatLastTs)chatLastTs=m.ts;
+  });
+  if((d.items||[]).length)box.scrollTop=box.scrollHeight;
+}
+async function sendMsg2(){
+  const inp=document.getElementById('chInput');const t=inp.value.trim();if(!t||!chatWith)return;inp.value='';
+  const box=document.getElementById('chMsgs');const e2=box.querySelector('.empty2');if(e2)e2.remove();
+  const el=document.createElement('div');el.className='msg me';el.textContent=t;box.appendChild(el);box.scrollTop=box.scrollHeight;
+  const r=await api('/api/message',{method:'POST',body:JSON.stringify({to:chatWith,text:t})});
+  if(r&&r.msg&&r.msg.ts>chatLastTs)chatLastTs=r.msg.ts;
+  else if(r&&r.error)alert("Yuborilmadi: "+r.error);
+}
+
+/* ===== PROFILE ===== */
+async function loadProfile(){
+  const el=document.getElementById('p-profile');el.innerHTML='<div class="center">…</div>';
+  const d=await api('/api/me');ME=d;LNG=d.lng||LNG;applyLang();
+  if(!d.registered){el.innerHTML=`<div class="empty"><div class="em">👤</div><div>${tr('needreg')}</div><button class="gbtn" onclick="tg.close()">${tr('open')}</button></div>`;return;}
+  const p=d.me;const ph=(p.photos&&p.photos[0])||'';
+  const pct=profilePct(p);
+  el.innerHTML=`<div class="pf">
+    <div class="avatar" style="background-image:url('${ph}')"></div>
+    <div class="nm">${esc(p.name)}, ${p.age||''} ${d.approved?'<span class="v">✔</span>':''}${p.premium?' 👑':''}</div>
+    <div class="city">${esc(p.city||'')}</div>
+    <div class="stats"><div><b>${d.likes}</b><span>${tr('layklar')}</span></div><div><b>${d.matches}</b><span>${tr('moslik')}</span></div><div><b>${d.days}</b><span>${tr('kunlar')}</span></div></div>
+    <div class="prog"><div class="r"><span>100% to'ldiring — ko'proq e'tibor oling</span><b>${pct}%</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>
+    <div class="rowc">
+      <div class="item" onclick="openEdit()"><div class="ic">✎</div><div class="tt"><b>${tr('edit')}</b></div><div class="rt">›</div></div>
+      <div class="item" onclick="toggleVis()"><div class="ic">👁</div><div class="tt"><b>${tr('visible')}</b></div><div class="sw ${d.visible?'on':''}" id="visSw"><i></i></div></div>
+    </div>
+    <div class="badge-ok">${d.approved?('✔ '+tr('confirmed')):('⏳ '+tr('pending2'))}</div>
+    <div class="rowc">
+      ${d.premium
+        ? `<div class="item" onclick="openPremium()"><div class="ic">👑</div><div class="tt"><b>Premium faol</b><small>${d.premium_until?('Muddat: '+new Date(+d.premium_until).toLocaleDateString('uz')):'Faol'}</small></div><div class="rt" style="color:var(--gold)">✓</div></div>`
+        : `<div class="item" onclick="openPremium()"><div class="ic">★</div><div class="tt"><b>${tr('premium')}</b><small>${tr('premdesc')}</small></div><div class="rt">›</div></div>`}
+      <div class="item" onclick="openBoost()"><div class="ic">⚡</div><div class="tt"><b>${tr('boost')}</b><small>${tr('boostdesc')}</small></div><div class="rt">›</div></div>
+    </div>
+    <div class="rowc">
+      <div class="item" onclick="inviteFriends()"><div class="ic">🎁</div><div class="tt"><b>${tr('invite')}</b><small>${tr('inviteDesc')}</small></div><div class="rt">›</div></div>
+    </div>
+    <div class="rowc">
+      <div class="item"><div class="ic">🌐</div><div class="tt"><b>${tr('lang')}</b></div>
+        <div class="langsel">
+          <button class="lgb ${LNG==='uz'?'on':''}" onclick="setLang('uz')">O'z</button>
+          <button class="lgb ${LNG==='ru'?'on':''}" onclick="setLang('ru')">Ру</button>
+        </div>
+      </div>
+    </div>
+    <div class="rowc"><div class="item" onclick="tg.close()"><div class="ic">💬</div><div class="tt"><b>${tr('help')}</b><small>${tr('helpdesc')}</small></div><div class="rt">›</div></div></div>
+    <button class="del" onclick="delProfile()">${tr('del')}</button>
+  </div>`;
+}
+function profilePct(p){let s=40;if(p.photos&&p.photos.length>1)s+=20;if(p.about)s+=25;if(p.city)s+=15;return Math.min(100,s);}
+async function doDelete(){
+  const r=await api('/api/delete_account',{method:'POST',body:'{}'});
+  if(r&&r.ok){ toast('Anketa o\'chirildi'); setTimeout(()=>{ if(tg&&tg.close)tg.close(); else location.reload(); },900); }
+  else{ toast('Xatolik, qayta urinib ko\'ring'); }
+}
+function delProfile(){
+  const q="Anketangizni butunlay o'chirasizmi? Barcha layk, match va yozishmalar o'chadi. Buni ortga qaytarib bo'lmaydi.";
+  if(tg&&tg.showPopup){
+    tg.showPopup({title:"Anketani o'chirish",message:q,buttons:[{id:'del',type:'destructive',text:"Ha, o'chirish"},{id:'no',type:'cancel',text:'Bekor qilish'}]},
+      id=>{ if(id==='del') doDelete(); });
+  }else{
+    if(confirm(q)) doDelete();
+  }
+}
+async function toggleVis(){
+  const sw=document.getElementById('visSw');const now=!sw.classList.contains('on');
+  sw.classList.toggle('on',now);
+  await api('/api/visibility',{method:'POST',body:JSON.stringify({visible:now})});
+}
+
+/* ===== badge ===== */
+async function refreshBadge(){const d=await api('/api/me');LNG=d.lng||LNG;applyLang();const b=document.getElementById('likeBadge');
+  if(d.likes>0){b.style.display='inline-block';b.textContent=d.likes;}else b.style.display='none';}
+
+/* ===== RO'YXATDAN O'TISH SEHRGARI ===== */
+const CITIES=["Toshkent","Samarqand","Buxoro","Andijon","Farg'ona","Namangan","Qarshi","Nukus","Urganch","Xiva","Termiz","Jizzax","Navoiy","Guliston","Nurafshon","Boshqa"];
+const GOALS=[["❤","Jiddiy munosabatlar"],["💍","Nikoh va oila"],["✨","Flirt va uchrashuvlar"],["👥","Muloqot va do'stlik"],["❓","Hali aniqlanmaganman"]];
+const STEPS=["name","age","gender","goal","city","photos"];
+let W={step:0,name:"",age:null,gender:"",goal:"",city:"Toshkent",about:"",photos:[]};
+let photoTarget=-1;
+
+function showWizard(){W.step=0;document.getElementById('wz').classList.add('on');renderWz();}
+function hideWizard(){document.getElementById('wz').classList.remove('on');}
+
+function renderWz(){
+  const s=STEPS[W.step];const b=document.getElementById('wzbody');const y=new Date().getFullYear();
+  document.getElementById('wzbar').style.width=((W.step+1)/STEPS.length*100)+"%";
+  document.getElementById('wzback').style.visibility=W.step===0?'hidden':'visible';
+  document.getElementById('wznext').textContent=(s==='photos')?"Anketa yaratish":"Davom etish";
+  let h="";
+  if(s==='name'){h=`<h2>Ismingiz nima?</h2><p class="hint">Bu ismni boshqalar anketangizda ko'radi.</p>
+    <input class="einp" id="w_name" placeholder="Ismingizni yozing" value="${esc(W.name)}" maxlength="40">`;}
+  else if(s==='age'){const t=W.age?((y-W.age)+' yil · '+W.age+' yosh'):'';
+    h=`<h2>Qachon tug'ilgansiz?</h2><p class="hint">Anketada yosh ko'rsatiladi, sana emas.</p>
+    <div class="erow" onclick="wzPickYear()"><div class="ei">🎂</div><div class="ek">Tug'ilgan yil</div>${t?`<div class="ev">${t}</div>`:'<div class="ev miss">Tanlang</div>'}<div class="ea">›</div></div>`;}
+  else if(s==='gender'){h=`<h2>Jinsingizni tanlang</h2><p class="hint">Anketa tasdiqlangandan keyin jinsni o'zgartirib bo'lmaydi.</p>
+    <div class="gsel"><div class="opt ${W.gender==='yigit'?'sel':''}" onclick="pick('gender','yigit')"><span class="ic">♂</span> Erkak</div><div class="opt ${W.gender==='qiz'?'sel':''}" onclick="pick('gender','qiz')"><span class="ic">♀</span> Ayol</div></div>`;}
+  else if(s==='goal'){h=`<h2>Nimani izlayapsiz?</h2><p class="hint">Xuddi shuni xohlaganlarni topishga yordam beramiz.</p>`+
+    GOALS.map(g=>`<div class="opt ${W.goal===g[1]?'sel':''}" onclick="pick('goal','${g[1]}')"><span class="ic">${g[0]}</span>${g[1]}<span class="rd"></span></div>`).join('');}
+  else if(s==='city'){h=`<h2>Qaysi shahardansiz?</h2><p class="hint">Yaqin atrofdagilarni ko'rsatamiz.</p>
+    <div class="erow" onclick="wzPickCity()"><div class="ei">📍</div><div class="ek">Shahar</div><div class="ev">${esc(W.city)}</div><div class="ea">›</div></div>
+    <h2 style="font-size:20px;margin-top:26px">O'zingiz haqingizda</h2><p class="hint">Ixtiyoriy — juftingizni topish ehtimolini oshiradi.</p>
+    <textarea class="einp" id="w_about" placeholder="Bir-ikki gap yozing..." maxlength="400">${esc(W.about)}</textarea>`;}
+  else if(s==='photos'){h=`<h2>Foto qo'shing</h2><p class="hint">Eng yaxshi suratlaringizni qo'shing. Yuzsiz suratlar va memlar moderatsiyadan o'tmaydi. (${W.photos.length}/6)</p>
+    <div class="photos">`+[0,1,2,3,4,5].map(i=>{const ph=W.photos[i];
+      return `<div class="pslot" onclick="pickPhoto(${i})">${ph?`<img src="${ph}"><button class="rm" onclick="event.stopPropagation();rmPhoto(${i})">✕</button>${i===0?'<div class="main">Asosiy</div>':''}`:'+'}</div>`;}).join('')+`</div>
+    <div class="hint2" style="margin-top:10px">Birinchi rasm — asosiy.</div>`;}
+  b.innerHTML=h;b.scrollTop=0;
+}
+function pick(k,v){W[k]=v;renderWz();}
+function wzSyncText(){const n=document.getElementById('w_name');if(n)W.name=n.value;const a=document.getElementById('w_about');if(a)W.about=a.value;}
+function wzPickYear(){const y=new Date().getFullYear();const o=[];for(let yr=y-14;yr>=y-70;yr--)o.push(yr+' ('+(y-yr)+' yosh)');openPicker("Tug'ilgan yil",o,W.age?((y-W.age)+' ('+W.age+' yosh)'):'',v=>{W.age=y-parseInt(v);renderWz();});}
+function wzPickCity(){wzSyncText();openPicker('Shahar',CITIES,W.city,v=>{W.city=v;renderWz();});}
+function pickPhoto(i){photoTarget=i;document.getElementById('wzfile').click();}
+function rmPhoto(i){W.photos.splice(i,1);renderWz();}
+document.getElementById('wzfile').addEventListener('change',async e=>{
+  const f=e.target.files[0];e.target.value="";if(!f)return;
+  const nx=document.getElementById('wznext');const old=nx.textContent;nx.textContent="Yuklanmoqda...";nx.disabled=true;
+  try{
+    const url=await uploadPhoto(f);
+    if(photoTarget>=0&&photoTarget<W.photos.length)W.photos[photoTarget]=url;else W.photos.push(url);
+  }catch(err){toast("Rasm yuklanmadi: "+err.message);}
+  nx.textContent=old;nx.disabled=false;renderWz();
+});
+function saveStep(){
+  const s=STEPS[W.step];
+  if(s==='name'){const el=document.getElementById('w_name');const v=el?el.value.trim():'';if(v.length<2){alert("Ismingizni yozing");return false;}W.name=v;}
+  if(s==='age'){if(!W.age){alert("Tug'ilgan yilni tanlang");return false;}}
+  if(s==='gender'){if(!W.gender){alert("Jinsni tanlang");return false;}}
+  if(s==='goal'){if(!W.goal){alert("Maqsadni tanlang");return false;}}
+  if(s==='city'){const a=document.getElementById('w_about');if(a)W.about=a.value.trim();}
+  if(s==='photos'){if(!W.photos.length){alert("Kamida bitta foto qo'shing");return false;}}
+  return true;
+}
+function wzPrev(){if(W.step>0){wzSyncText();W.step--;renderWz();}}
+async function wzNext(){
+  if(!saveStep())return;
+  if(W.step<STEPS.length-1){W.step++;renderWz();return;}
+  const nx=document.getElementById('wznext');nx.textContent="Yuborilmoqda...";nx.disabled=true;
+  const r=await api('/api/register',{method:'POST',body:JSON.stringify({name:W.name,age:W.age,gender:W.gender,goal:W.goal,city:W.city,about:W.about,photos:W.photos})});
+  nx.disabled=false;nx.textContent="Anketa yaratish";
+  if(r&&r.ok){hideWizard();loadFeed();refreshBadge();}
+  else alert("Xato: "+(r&&r.error||"qayta urining"));
+}
+
+/* ===== PREMIUM / BOOST ===== */
+const ADMIN_USERNAME='Luvoraadmin';
+const PPLANS=[
+  {id:'7',t:"7 kun",days:7,stars:169,som:10000},
+  {id:'30',t:"1 oy",days:30,stars:249,som:20000},
+  {id:'90',t:"3 oy",days:90,stars:599,som:50000,badge:"Foydali"},
+];
+const PFEATS=[
+  ["♡","Cheksiz layklar","Cheklovsiz layk bering va ko'proq odamlarni toping"],
+  ["🎁","Har kuni bepul sovg'a","Uning e'tiborini torting va anketangizni oldinga chiqaring"],
+  ["↺","Swaypni qaytarish","Tasodifan o'tkazib yuborgan anketani qaytaring"],
+  ["⚡","Lentada ustuvorlik","Sizni boshqa foydalanuvchilardan oldin ko'radilar"],
+  ["➤","Telegramga o'tish","Foydalanuvchida @username mavjud bo'lsa"],
+];
+let pplan='30';
+function fmt(n){return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g," ");}
+function openPremium(){document.getElementById('premiumSheet').classList.add('on');renderPremium();}
+function renderPremium(){
+  const p=PPLANS.find(x=>x.id===pplan);const perday=Math.round(p.som/p.days);
+  document.getElementById('premiumPanel').innerHTML=`
+    <div class="grip"></div><div class="crown">♔</div>
+    <h1>Luvora Premium</h1><div class="sublt">Cheklovsiz tanishing</div>
+    <div class="feat">${PFEATS.map(f=>`<div class="f"><div class="ic">${f[0]}</div><div><b>${f[1]}</b><small>${f[2]}</small></div></div>`).join('')}</div>
+    <div class="plans">${PPLANS.map(x=>`<div class="plan ${x.id===pplan?'sel':''}" onclick="pplan='${x.id}';renderPremium()">${x.badge?`<div class="bdg">${x.badge}</div>`:''}<b>${x.t}</b><span>${x.stars}⭐</span></div>`).join('')}</div>
+    <div class="pay best" onclick="payAdmin()"><div class="bb">Tavsiya</div><div class="nm">💳 Karta orqali (admin)</div><div class="pr"><b>${fmt(p.som)} so'm</b><small>qo'lda tasdiq</small></div></div>
+    <div class="pay" onclick="pay('Click')"><div class="nm">🔵 Click orqali to'lash</div><div class="pr"><b>${fmt(p.som)} so'm</b><small>≈ ${fmt(perday)} so'm/kun</small></div></div>
+    <div class="pay" onclick="pay('Payme')"><div class="nm">🟦 Payme orqali to'lash</div><div class="pr"><b>${fmt(p.som)} so'm</b><small>≈ ${fmt(perday)} so'm/kun</small></div></div>
+    <div class="pay" onclick="buyStars('prem${pplan}')"><div class="nm">⭐ Telegram Stars bilan</div><div class="pr"><b>${p.stars} ⭐</b></div></div>
+    <button class="notnow" onclick="closeSheet('premiumSheet')">Hozir emas</button>`;
+}
+const BOOST=[{id:'1',t:"1 soat",stars:99,som:19900},{id:'6',t:"6 soat",stars:149,som:29900,badge:"Foydaliroq"}];
+let bsel='1';
+function openBoost(){document.getElementById('boostSheet').classList.add('on');renderBoost();}
+function renderBoost(){
+  const b=BOOST.find(x=>x.id===bsel);
+  document.getElementById('boostPanel').innerHTML=`
+    <div class="grip"></div><div class="crown">⚡</div>
+    <h1 style="color:var(--gold)">Anketani yuqoriga ko'tarish</h1>
+    <div class="sublt">Sizni <b style="color:var(--text)">5 baravar ko'p odam</b> ko'radi.<br>Ko'proq ko'rsatish — ko'proq layk</div>
+    <div class="boostopt">${BOOST.map(x=>`<div class="o ${x.id===bsel?'sel':''}" onclick="bsel='${x.id}';renderBoost()">${x.badge?`<div class="bdg">${x.badge}</div>`:''}<div class="ic">⚡</div><div class="h">${x.t}</div><div class="st">${x.stars} Stars</div><div class="sm">${fmt(x.som)} so'm</div></div>`).join('')}</div>
+    <button class="gbtn" style="width:100%" onclick="buyStars('boost${bsel}')">${b.t}ga ko'tarish — ${b.stars} ⭐</button>
+    <button class="notnow" onclick="closeSheet('boostSheet')">Hozir emas</button>`;
+}
+function closeSheet(id){document.getElementById(id).classList.remove('on');}
+function pay(method){
+  const msg="Bu to'lov usuli ("+method+") server o'rnatilgach ulanadi. Hozircha Telegram Stars bilan to'lang ⭐";
+  tg.showPopup?tg.showPopup({title:"To'lov",message:msg,buttons:[{type:'ok'}]}):alert(msg);
+}
+async function payAdmin(){
+  try{await api('/api/request_premium',{method:'POST',body:JSON.stringify({plan:pplan})});}catch(e){}
+  const un=ADMIN_USERNAME;
+  const msg="Karta orqali to'lash:\n1) @"+un+" ga yozing (so'rovingiz yuborildi)\n2) Admin karta raqamini beradi\n3) Pulni o'tkazib, chekni yuboring\n4) Admin sizga Premium beradi ✅";
+  if(tg.showPopup){tg.showPopup({title:"Karta orqali",message:msg,buttons:[{id:'go',type:'default',text:"Adminga yozish"},{type:'cancel'}]},id=>{if(id==='go')openAdminChat(un);});}
+  else{alert(msg);openAdminChat(un);}
+}
+function openAdminChat(un){closeSheet('premiumSheet');tg.openTelegramLink?tg.openTelegramLink('https://t.me/'+un):window.open('https://t.me/'+un);}
+async function buyStars(product){
+  const r=await api('/api/invoice',{method:'POST',body:JSON.stringify({product})});
+  if(!r||!r.link){alert("To'lovni yaratib bo'lmadi"+(r&&r.detail?': '+r.detail:''));return;}
+  if(!tg.openInvoice){alert("Telegram versiyangiz Stars to'lovini qo'llamaydi — ilovani yangilang.");return;}
+  tg.openInvoice(r.link,(status)=>{
+    if(status==='paid'){closeSheet('premiumSheet');closeSheet('boostSheet');toast("👑 Faollashди!");setTimeout(()=>{loadProfile();refreshBadge();},1200);}
+    else if(status==='failed')toast("To'lov amalga oshmadi");
+  });
+}
+
+/* ===== PROFIL TAHRIRLASH ===== */
+const E_PETS=["Yo'q","Mushuk","It","Boshqa"];
+const E_HABITS=["Yo'q","Ba'zan","Doim"];
+const E_SPORT=["Har kuni","Ba'zan","Yo'q"];
+const E_EDU=["O'rta","Kollej","Bakalavr","Magistr","Doktorantura"];
+const E_FAMILY=["Farzand xohlayman","Xohlamayman","Hali bilmayman"];
+const E_COMM=["Tez-tez yozaman","Qo'ng'iroqni afzal ko'raman","Kamdan-kam"];
+const E_INTERESTS=["Sayohat","Musiqa","Kino","Kitob","Sport","Oshpazlik","Rasm","O'yinlar","Fotografiya","Raqs","Fitnes","Tabiat","Hayvonlar","Texnologiya","Moda","Til o'rganish"];
+const E_GOALS=["Jiddiy munosabatlar","Nikoh va oila","Flirt va uchrashuvlar","Muloqot va do'stlik","Hali aniqlanmaganman"];
+let E=null,EID=null,EMediaRaw=[];
+
+async function openEdit(){
+  const d=await api('/api/me');if(!d.registered)return;
+  const p=d.me;EID=p.id;EMediaRaw=p.media_raw||[];
+  E={name:p.name||'',about:p.about||'',city:p.city||'Toshkent',age:p.age||null,goal:p.goal||'',height:p.height||'',
+     pref_age_min:p.pref_age_min||18,pref_age_max:p.pref_age_max||30,interests:Array.isArray(p.interests)?p.interests.slice():[],
+     pets:p.pets||'',habits:p.habits||'',sport:p.sport||'',education:p.education||'',family:p.family||'',comm:p.comm||'',gender:p.gender,
+     photos:EMediaRaw.map((m,i)=>({type:'existing',idx:i}))};
+  document.getElementById('editv').classList.add('on');
+  renderEdit();
+}
+function closeEdit(){document.getElementById('editv').classList.remove('on');loadProfile();}
+function editPct(){let s=0;if(E.photos.length)s+=25;if(E.photos.length>1)s+=5;if(E.about&&E.about.length>=10)s+=20;if(E.interests.length)s+=10;if(E.goal)s+=10;if(E.height)s+=5;if(E.pets)s+=5;if(E.sport)s+=5;if(E.education)s+=5;if(E.family)s+=5;if(E.comm)s+=5;return Math.min(100,s);}
+function ev(val,pct){return val?`<div class="ev">${esc(String(val))}</div>`:`<div class="ev miss">Qo'shish<span class="pctb">+${pct}%</span></div>`;}
+function erow(icon,label,valHtml,fn){return `<div class="erow" onclick="${fn}"><div class="ei">${icon}</div><div class="ek">${label}</div>${valHtml}<div class="ea">›</div></div>`;}
+function reEdit(){const a=document.getElementById('e_about');if(a)E.about=a.value;const n=document.getElementById('e_name');if(n)E.name=n.value;renderEdit();}
+function renderEdit(){
+  const pct=editPct();
+  document.getElementById('editBody').innerHTML=`
+    <div class="eprog"><div class="r"><span>Profil to'ldirilgan</span><b>${pct}%</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>
+    <div class="sec">Rasmlar ${E.photos.length<2?'<span class="pctb">+5%</span>':''}</div>
+    <div class="ephotos" id="ephotosWrap"></div>
+    <div class="hint2">Birinchi rasm — asosiy. "Asosiy qilish" bilan tartibni o'zgartir.</div>
+    <div class="sec">O'zingiz haqingizda ${(!E.about||E.about.length<10)?'<span class="pctb">+25%</span>':''}</div>
+    <textarea class="einp" id="e_about" maxlength="400" placeholder="O'zingiz haqingizda biroz aytib bering...">${esc(E.about)}</textarea>
+    <div class="hint2">Telefon raqami, havola, username, so'kinish va reklama yozmang.</div>
+    <div class="sec">Tafsilotlar</div>
+    ${erow('📏',"Bo'y, sm",ev(E.height?E.height+' sm':'',5),'pickHeight()')}
+    <div class="sec">Sherikning yoshi — <span id="e_arange" style="color:var(--gold)">${E.pref_age_min}–${E.pref_age_max}</span></div>
+    <div class="rng"><span class="lab">18</span><input type="range" id="e_amin" min="18" max="65" value="${E.pref_age_min}" oninput="eArange()"><span class="lab">65</span></div>
+    <div class="rng"><span class="lab">18</span><input type="range" id="e_amax" min="18" max="65" value="${E.pref_age_max}" oninput="eArange()"><span class="lab">65</span></div>
+    <div class="sec">Qiziqishlar va maqsad</div>
+    ${erow('★','Qiziqishlar',ev(E.interests.length?E.interests.length+' ta':'',10),'pickInterests()')}
+    ${erow('♡','Tanishuv maqsadi',ev(E.goal,10),'pickGoal()')}
+    <div class="sec">Turmush tarzi</div>
+    ${erow('🐾','Uy hayvonlari',ev(E.pets,5),'pickPets()')}
+    ${erow('🍷','Zararli odatlar',ev(E.habits,2),'pickHabits()')}
+    ${erow('🏃','Sport',ev(E.sport,5),'pickSport()')}
+    <div class="sec">Men haqimda ko'proq</div>
+    ${erow('🎓',"Ta'lim",ev(E.education,5),'pickEdu()')}
+    ${erow('👪','Oilaviy rejalar',ev(E.family,3),'pickFamily()')}
+    ${erow('💬','Muloqot uslubi',ev(E.comm,3),'pickComm()')}
+    <div class="sec">Asosiy</div>
+    <div class="fld"><label>Ism</label><input class="einp" id="e_name" maxlength="40" value="${esc(E.name)}"></div>
+    ${erow('🎂',"Tug'ilgan sana",ev(E.age?E.age+' yosh':'',0),'pickYear()')}
+    <div class="fld"><label>Jins (o'zgartirib bo'lmaydi)</label><div class="glock">${E.gender==='qiz'?'Ayol':'Erkak'}</div></div>
+    ${erow('📍','Shahar',ev(E.city,0),'pickCity()')}`;
+  renderPhotoGrid();
+}
+function eArange(){let a=+document.getElementById('e_amin').value,b=+document.getElementById('e_amax').value;if(a>b){const t=a;a=b;b=t;}document.getElementById('e_arange').textContent=a+"–"+b;E.pref_age_min=a;E.pref_age_max=b;}
+
+/* --- picker (pastdan chiqadigan tanlagich) --- */
+let _pickOpts=[],_pickCb=null;
+function openPicker(title,opts,cur,cb){_pickOpts=opts.map(String);_pickCb=cb;
+  document.getElementById('pickerPanel').innerHTML=`<div class="grip"></div><div class="psh">${esc(title)}</div>`+
+    _pickOpts.map((o,i)=>`<div class="pick ${o===String(cur)?'sel':''}" onclick="pickChoose(${i})">${esc(o)}${o===String(cur)?' ✓':''}</div>`).join('')+
+    `<button class="notnow" onclick="closeSheet('pickerSheet')">Yopish</button>`;
+  document.getElementById('pickerSheet').classList.add('on');}
+function pickChoose(i){closeSheet('pickerSheet');const v=_pickOpts[i];if(_pickCb)_pickCb(v);}
+let _mOpts=[],_mSel=[],_mTitle='',_mCb=null;
+function openMulti(title,opts,selected,cb){_mOpts=opts.slice();_mSel=selected.slice();_mTitle=title;_mCb=cb;renderMulti();document.getElementById('pickerSheet').classList.add('on');}
+function renderMulti(){document.getElementById('pickerPanel').innerHTML=`<div class="grip"></div><div class="psh">${esc(_mTitle)} <span style="color:var(--muted);font-size:15px">(${_mSel.length})</span></div><div class="chips" style="margin-bottom:18px">`+_mOpts.map((o,i)=>`<div class="chip ${_mSel.includes(o)?'on':''}" onclick="mTog(${i})">${esc(o)}</div>`).join('')+`</div><button class="gbtn" style="width:100%" onclick="mDone()">Tayyor</button>`;}
+function mTog(i){const o=_mOpts[i];const k=_mSel.indexOf(o);if(k>=0)_mSel.splice(k,1);else if(_mSel.length<10)_mSel.push(o);renderMulti();}
+function mDone(){closeSheet('pickerSheet');if(_mCb)_mCb(_mSel.slice());}
+/* --- har bir maydon uchun --- */
+function pickHeight(){const o=[];for(let h=140;h<=210;h++)o.push(h+' sm');openPicker("Bo'y",o,E.height?E.height+' sm':'',v=>{E.height=parseInt(v);reEdit();});}
+function pickYear(){const y=new Date().getFullYear();const o=[];for(let yr=y-14;yr>=y-70;yr--)o.push(yr+' ('+(y-yr)+' yosh)');const cur=E.age?((y-E.age)+' ('+E.age+' yosh)'):'';openPicker("Tug'ilgan yil",o,cur,v=>{E.age=y-parseInt(v);reEdit();});}
+function pickCity(){openPicker('Shahar',CITIES,E.city,v=>{E.city=v;reEdit();});}
+function pickGoal(){openPicker('Tanishuv maqsadi',E_GOALS,E.goal,v=>{E.goal=v;reEdit();});}
+function pickPets(){openPicker('Uy hayvonlari',E_PETS,E.pets,v=>{E.pets=v;reEdit();});}
+function pickHabits(){openPicker('Zararli odatlar',E_HABITS,E.habits,v=>{E.habits=v;reEdit();});}
+function pickSport(){openPicker('Sport',E_SPORT,E.sport,v=>{E.sport=v;reEdit();});}
+function pickEdu(){openPicker("Ta'lim",E_EDU,E.education,v=>{E.education=v;reEdit();});}
+function pickFamily(){openPicker('Oilaviy rejalar',E_FAMILY,E.family,v=>{E.family=v;reEdit();});}
+function pickComm(){openPicker('Muloqot uslubi',E_COMM,E.comm,v=>{E.comm=v;reEdit();});}
+function pickInterests(){openMulti('Qiziqishlar',E_INTERESTS,E.interests,arr=>{E.interests=arr;reEdit();});}
+function epSrc(x){return x.type==='new'?x.url:`/photo/${EID}/${x.idx}`;}
+function renderPhotoGrid(){
+  let h='';E.photos.forEach((x,i)=>{h+=`<div class="epslot filled"><img src="${epSrc(x)}"><span class="num">${i+1}</span><button class="x" onclick="epRemove(${i})">✕</button>${i===0?'<div class="main">Asosiy</div>':`<div class="main" style="background:rgba(0,0,0,.55);color:#fff" onclick="epMain(${i})">Asosiy qilish</div>`}</div>`;});
+  if(E.photos.length<6)h+=`<div class="epslot" onclick="document.getElementById('editFile').click()">+</div>`;
+  document.getElementById('ephotosWrap').innerHTML=h;
+}
+function epRemove(i){E.photos.splice(i,1);renderPhotoGrid();}
+function epMain(i){const it=E.photos.splice(i,1)[0];E.photos.unshift(it);renderPhotoGrid();}
+document.getElementById('editFile').addEventListener('change',async e=>{
+  const f=e.target.files[0];e.target.value="";if(!f)return;
+  try{const url=await uploadPhoto(f);E.photos.push({type:'new',url:url});renderPhotoGrid();}
+  catch(err){toast("Rasm yuklanmadi: "+err.message);}
+});
+async function saveEdit(){
+  const a=document.getElementById('e_about');if(a)E.about=a.value.trim();
+  const n=document.getElementById('e_name');if(n)E.name=n.value.trim();
+  let amin=+document.getElementById('e_amin').value,amax=+document.getElementById('e_amax').value;if(amin>amax){const t=amin;amin=amax;amax=t;}E.pref_age_min=amin;E.pref_age_max=amax;
+  const media=E.photos.map(x=>x.type==='new'?{type:'photo',url:x.url}:EMediaRaw[x.idx]);
+  const btn=document.querySelector('.esave .gbtn');if(btn){btn.textContent="Saqlanmoqda...";btn.disabled=true;}
+  const r=await api('/api/update_profile',{method:'POST',body:JSON.stringify({
+    name:E.name,about:E.about,city:E.city,age:E.age,goal:E.goal,height:E.height,
+    pref_age_min:E.pref_age_min,pref_age_max:E.pref_age_max,interests:E.interests,
+    pets:E.pets,habits:E.habits,sport:E.sport,education:E.education,family:E.family,comm:E.comm,media:media})});
+  if(btn){btn.textContent="Saqlash";btn.disabled=false;}
+  if(r&&r.ok){tg.showPopup?tg.showPopup({message:"Saqlandi ✅"}):alert("Saqlandi ✅");closeEdit();}
+  else alert("Xato: "+(r&&r.error||"qayta urining"));
+}
+
+function showErr(m){try{var d=document.getElementById('deck');if(d)d.innerHTML='<div class="empty"><div class="em">⚠️</div><div style="color:var(--text);font-size:14px;padding:0 18px">'+m+'</div><div style="color:var(--muted);font-size:12px;margin-top:8px">initData: '+(INIT?('bor, '+INIT.length+' belgi'):'YO\'Q (Telegram tashqarisida?)')+'</div></div>';}catch(e){}}
+window.addEventListener('error',ev=>showErr('JS xato: '+ev.message));
+window.addEventListener('unhandledrejection',ev=>showErr('Promise xato: '+(ev.reason&&ev.reason.message||ev.reason)));
+(async()=>{try{await refreshBadge();}catch(e){}try{await loadFeed();}catch(e){showErr('loadFeed: '+(e&&e.message||e));}})();
+</script>
+</body>
+</html>

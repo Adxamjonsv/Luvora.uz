@@ -1,0 +1,5 @@
+# Luvora — HTTPS reverse proxy (Caddy avtomatik SSL sertifikat oladi)
+# SIZNING-DOMEN.uz ni o'z domeningizga almashtiring.
+SIZNING-DOMEN.uz {
+    reverse_proxy 127.0.0.1:8080
+}

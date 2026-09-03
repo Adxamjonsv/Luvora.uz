@@ -1,0 +1,21 @@
+SEED (boshlang'ich) ANKETALAR RASMLARI
+=======================================
+
+Bu papkaga AI'da yaratilgan (haqiqiy odam BO'LMAGAN) qiz rasmlarini joylang.
+
+QANDAY:
+1. Rasmlarni .jpg formatida tayyorlang.
+2. Nomini raqam qiling: 1.jpg, 2.jpg, 3.jpg ... 300.jpg
+3. Shu papkaga (miniapp/seed_photos/) tashlang.
+
+- 1.jpg  -> "demo_s1" anketasiga tushadi
+- 2.jpg  -> "demo_s2" anketasiga
+- ... 300.jpg gacha
+
+MUHIM:
+- Faqat AI yasagan yuzlardan foydalaning (haqiqiy odamning shaxsiy rasmi EMAS).
+- Rasm hali qo'yilmagan anketa chiroyli gradient + 👩 belgisi bilan ko'rinadi (buzilmaydi).
+- Rasm qo' shgach botni qayta ishga tushirish SHART EMAS — darrov ko'rinadi
+  (agar ko'rinmasa, ilovani yopib qayta oching yoki brauzer keshini tozalang).
+
+Real qizlar qo'shilgani sari bu soxta anketalar lentada avtomatik kamayadi.

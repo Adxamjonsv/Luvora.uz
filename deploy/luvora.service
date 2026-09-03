@@ -1,0 +1,13 @@
+[Unit]
+Description=Luvora Telegram bot + Mini App
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/luvora
+ExecStart=/opt/luvora/venv/bin/python /opt/luvora/dvinchik_bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
